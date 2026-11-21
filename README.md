@@ -115,7 +115,7 @@ document and four probes:
 
 | input | ψ | gate |
 |---|---|---|
-| 8 training documents | +0.33 … +0.52 | open (all served) |
+| the eight demo documents (six synthesised, two withheld) | +0.33 … +0.52 | open (all served) |
 | same invoice, one amount edited | +0.42 | open |
 | same invoice, `$` replaced by `USD` | +0.34 | open → kernel rejects → scar |
 | EUR-only document | −0.05 | **closed**, model answers, status stays `LOCKED` |
@@ -135,8 +135,9 @@ widen the kernel's domain. A learned repair operator is a separate, harder objec
 
 **The well is a heuristic.** Depth is max training distance × 1.05 in a 1024-dim hashed space. It is
 not a calibrated density model, and 1024 dimensions of trigrams will collide. It is deliberately
-cheap: microseconds, no model, no training. Treat the radius as a knob to tune against your own
-false-route rate, not a theorem.
+cheap — no model, no training — but not free: the projection is one pass over the input's trigrams,
+so it costs a few milliseconds on a multi-kilobyte document, not microseconds. Treat the radius as a
+knob to tune against your own false-route rate, not a theorem.
 
 ## Try it
 
@@ -146,6 +147,7 @@ python calcify.py compile invoice_extract
 python example.py                 # served by the kernel, zero tokens
 python example.py --drift         # gate closes, model answers
 python nsrc_probe.py gate         # ψ and M for every document and probe
+python test_ledger.py             # offline: the accounting survives a re-seal
 ```
 
 Tamper check:
@@ -159,4 +161,19 @@ cp /tmp/k.bak calcified/invoice_extract.py
 
 ## Requirements
 
-Python 3.10+, `numpy`. SQLite in WAL mode, created next to the script.
+Python 3.10+, `numpy`. SQLite in WAL mode.
+
+The ledger and the kernels live next to `calcify.py`, not next to your script — otherwise running
+from two directories silently creates two ledgers and every task looks unobserved. Override them,
+and the synthesis timeout, with:
+
+```bash
+export CALCIFY_DB=/path/to/calcify.db
+export CALCIFY_DIR=/path/to/calcified
+export CALCIFY_TIMEOUT=300          # seconds, synthesis only
+```
+
+`tokens_observing` is an estimate (characters ÷ 4), not a provider reading. `tokens_synthesizing` is
+the provider's own count and accumulates across recompiles — nothing in the ledger is ever reset by
+a re-seal. Traces the gate routed away are stored with `source='escaped'` and excluded from training:
+they are out-of-distribution by construction, and feeding them back would poison the well.
