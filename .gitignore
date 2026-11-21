@@ -1,0 +1,6 @@
+__pycache__/
+calcify.db
+calcify.db-shm
+calcify.db-wal
+calcified/*.py
+LAUNCH.md
